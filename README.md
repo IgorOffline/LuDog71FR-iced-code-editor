@@ -41,7 +41,6 @@ Screenshot of the demo application:
 
 - [ ] Multiple cursors for simultaneous editing at multiple positions
 - [ ] Collapse/expand blocks
-- [ ] Indentation-based or syntax-aware
 - [ ] Minimap
 
 ## Quick Start
@@ -157,7 +156,7 @@ The editor supports a comprehensive set of keyboard shortcuts:
 | **Delete**         | Delete character after cursor (or delete selection if text is selected)  |
 | **Shift + Delete** | Delete selected text (same as Delete when selection exists)              |
 | **Enter**          | Insert new line                                                          |
-| **Tab**            | Insert 4 spaces (indent)                                                 |
+| **Tab**            | Insert indent                                                            |
 
 ### Clipboard
 
@@ -317,6 +316,41 @@ if editor.line_numbers_enabled() {
 ```
 
 When disabled, the gutter is completely removed (0px width), providing more horizontal space for code display.
+
+### Indentation
+
+Auto-indentation is **enabled by default**: pressing Enter copies the leading whitespace of the current line to the new line. The indentation style (spaces or tab) is **4 spaces by default** and controls what is inserted when pressing Tab.
+
+```rust
+// Disable auto-indentation on Enter
+editor.set_auto_indent_enabled(false);
+
+// Check current state
+if editor.auto_indent_enabled() {
+    println!("Auto-indentation is active");
+}
+```
+
+```rust
+use iced_code_editor::IndentStyle;
+
+// Use 2 spaces per indent level
+editor.set_indent_style(IndentStyle::Spaces(2));
+
+// Use tabs instead of spaces
+editor.set_indent_style(IndentStyle::Tab);
+
+// Restore the default (4 spaces)
+editor.set_indent_style(IndentStyle::Spaces(4));
+
+// Check current style
+match editor.indent_style() {
+    IndentStyle::Spaces(n) => println!("Indenting with {n} spaces"),
+    IndentStyle::Tab => println!("Indenting with tabs"),
+}
+```
+
+Available styles via `IndentStyle::ALL`: `Spaces(2)`, `Spaces(4)`, `Spaces(8)`, `Tab`.
 
 ### Language Server Protocol (LSP)
 

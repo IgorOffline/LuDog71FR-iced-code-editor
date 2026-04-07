@@ -209,6 +209,10 @@ pub struct CodeEditor {
     pub(crate) is_grouping: bool,
     /// Line wrapping enabled
     pub(crate) wrap_enabled: bool,
+    /// Auto-indentation enabled
+    pub(crate) auto_indent_enabled: bool,
+    /// Indentation style (spaces or tab)
+    pub(crate) indent_style: IndentStyle,
     /// Wrap column (None = wrap at viewport width)
     pub(crate) wrap_column: Option<usize>,
     /// Search state
@@ -396,6 +400,37 @@ pub enum Message {
     ImeClosed,
 }
 
+/// Indentation style used when pressing the Tab key.
+///
+/// Controls whether indentation inserts spaces or a tab character.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IndentStyle {
+    /// Insert `n` space characters.
+    Spaces(u8),
+    /// Insert a single tab character (`\t`).
+    Tab,
+}
+
+impl IndentStyle {
+    /// All standard indentation styles available for selection.
+    pub const ALL: [IndentStyle; 4] = [
+        IndentStyle::Spaces(2),
+        IndentStyle::Spaces(4),
+        IndentStyle::Spaces(8),
+        IndentStyle::Tab,
+    ];
+}
+
+impl std::fmt::Display for IndentStyle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IndentStyle::Spaces(1) => write!(f, "1 space"),
+            IndentStyle::Spaces(n) => write!(f, "{n} spaces"),
+            IndentStyle::Tab => write!(f, "Tab"),
+        }
+    }
+}
+
 /// Arrow key directions
 #[derive(Debug, Clone, Copy)]
 pub enum ArrowDirection {
@@ -448,6 +483,8 @@ impl CodeEditor {
             history: CommandHistory::new(100),
             is_grouping: false,
             wrap_enabled: true,
+            auto_indent_enabled: true,
+            indent_style: IndentStyle::Spaces(4),
             wrap_column: None,
             search_state: search::SearchState::new(),
             translations: Translations::default(),
@@ -1194,6 +1231,46 @@ impl CodeEditor {
     /// `true` if line wrapping is enabled, `false` otherwise
     pub fn wrap_enabled(&self) -> bool {
         self.wrap_enabled
+    }
+
+    /// Enables or disables automatic indentation on Enter.
+    ///
+    /// When enabled, pressing Enter copies the leading whitespace of the
+    /// current line to the new line. When disabled, the cursor is placed
+    /// at column 0 on the new line.
+    ///
+    /// # Arguments
+    ///
+    /// * `enabled` - `true` to enable auto-indentation, `false` to disable
+    pub fn set_auto_indent_enabled(&mut self, enabled: bool) {
+        self.auto_indent_enabled = enabled;
+    }
+
+    /// Returns whether auto-indentation is enabled.
+    ///
+    /// # Returns
+    ///
+    /// `true` if auto-indentation is enabled, `false` otherwise
+    pub fn auto_indent_enabled(&self) -> bool {
+        self.auto_indent_enabled
+    }
+
+    /// Sets the indentation style used when pressing the Tab key.
+    ///
+    /// # Arguments
+    ///
+    /// * `style` - The indentation style (`IndentStyle::Spaces(n)` or `IndentStyle::Tab`)
+    pub fn set_indent_style(&mut self, style: IndentStyle) {
+        self.indent_style = style;
+    }
+
+    /// Returns the current indentation style.
+    ///
+    /// # Returns
+    ///
+    /// The current [`IndentStyle`] configured for this editor
+    pub fn indent_style(&self) -> IndentStyle {
+        self.indent_style
     }
 
     /// Enables or disables the search/replace functionality.

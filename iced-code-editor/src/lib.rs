@@ -209,7 +209,9 @@ pub mod theme;
 pub use canvas_editor::lsp::{
     LspClient, LspDocument, LspPosition, LspRange, LspTextChange,
 };
-pub use canvas_editor::{ArrowDirection, CodeEditor, CommandHistory, Message};
+pub use canvas_editor::{
+    ArrowDirection, CodeEditor, CommandHistory, IndentStyle, Message,
+};
 pub use i18n::{Language, Translations};
 pub use theme::{Catalog, Style, StyleFn, from_iced_theme};
 

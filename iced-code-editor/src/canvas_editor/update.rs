@@ -8,7 +8,8 @@ use super::command::{
     InsertCharCommand, InsertNewlineCommand, ReplaceTextCommand,
 };
 use super::{
-    ArrowDirection, CURSOR_BLINK_INTERVAL, CodeEditor, ImePreedit, Message,
+    ArrowDirection, CURSOR_BLINK_INTERVAL, CodeEditor, ImePreedit, IndentStyle,
+    Message,
 };
 
 impl CodeEditor {
@@ -140,22 +141,29 @@ impl CodeEditor {
     /// A `Task<Message>` that scrolls to keep the cursor visible (including
     /// horizontal scroll when wrap is disabled)
     fn handle_tab(&mut self) -> Task<Message> {
-        // Insert 4 spaces for Tab
-        // Start grouping if not already grouping
         self.ensure_grouping_started("Tab");
 
         let (line, col) = self.cursor;
-        // Insert 4 spaces
-        for i in 0..4 {
-            let current_col = col + i;
-            let mut cmd = InsertCharCommand::new(
-                line,
-                current_col,
-                ' ',
-                (line, current_col),
-            );
-            cmd.execute(&mut self.buffer, &mut self.cursor);
-            self.history.push(Box::new(cmd));
+        match self.indent_style {
+            IndentStyle::Spaces(n) => {
+                for i in 0..n as usize {
+                    let current_col = col + i;
+                    let mut cmd = InsertCharCommand::new(
+                        line,
+                        current_col,
+                        ' ',
+                        (line, current_col),
+                    );
+                    cmd.execute(&mut self.buffer, &mut self.cursor);
+                    self.history.push(Box::new(cmd));
+                }
+            }
+            IndentStyle::Tab => {
+                let mut cmd =
+                    InsertCharCommand::new(line, col, '\t', (line, col));
+                cmd.execute(&mut self.buffer, &mut self.cursor);
+                self.history.push(Box::new(cmd));
+            }
         }
 
         self.finish_edit_operation();
@@ -214,7 +222,20 @@ impl CodeEditor {
         self.end_grouping_if_active();
 
         let (line, col) = self.cursor;
-        let mut cmd = InsertNewlineCommand::new(line, col, self.cursor);
+
+        // Copy leading whitespace of the current line to the new line (if enabled)
+        let indent: String = if self.auto_indent_enabled {
+            self.buffer
+                .line(line)
+                .chars()
+                .take_while(|c| c.is_whitespace())
+                .collect()
+        } else {
+            String::new()
+        };
+
+        let mut cmd =
+            InsertNewlineCommand::with_indent(line, col, self.cursor, indent);
         cmd.execute(&mut self.buffer, &mut self.cursor);
         self.history.push(Box::new(cmd));
 
@@ -1961,5 +1982,48 @@ mod tests {
 
         assert!(editor.has_canvas_focus);
         assert!(editor.show_cursor);
+    }
+
+    #[test]
+    fn test_enter_no_indent() {
+        let mut editor = CodeEditor::new("hello", "rs");
+        editor.cursor = (0, 5);
+        let _ = editor.update(&Message::Enter);
+        assert_eq!(editor.buffer.line(0), "hello");
+        assert_eq!(editor.buffer.line(1), "");
+        assert_eq!(editor.cursor, (1, 0));
+    }
+
+    #[test]
+    fn test_enter_auto_indent_spaces() {
+        let mut editor = CodeEditor::new("    hello", "rs");
+        editor.cursor = (0, 9);
+        let _ = editor.update(&Message::Enter);
+        assert_eq!(editor.buffer.line(0), "    hello");
+        assert_eq!(editor.buffer.line(1), "    ");
+        assert_eq!(editor.cursor, (1, 4));
+    }
+
+    #[test]
+    fn test_enter_auto_indent_tab() {
+        let mut editor = CodeEditor::new("\thello", "rs");
+        editor.cursor = (0, 6);
+        let _ = editor.update(&Message::Enter);
+        assert_eq!(editor.buffer.line(0), "\thello");
+        assert_eq!(editor.buffer.line(1), "\t");
+        assert_eq!(editor.cursor, (1, 1));
+    }
+
+    #[test]
+    fn test_enter_auto_indent_undo() {
+        let mut editor = CodeEditor::new("    hello", "rs");
+        editor.cursor = (0, 9);
+        let _ = editor.update(&Message::Enter);
+        assert_eq!(editor.buffer.line_count(), 2);
+
+        let _ = editor.update(&Message::Undo);
+        assert_eq!(editor.buffer.line_count(), 1);
+        assert_eq!(editor.buffer.line(0), "    hello");
+        assert_eq!(editor.cursor, (0, 9));
     }
 }

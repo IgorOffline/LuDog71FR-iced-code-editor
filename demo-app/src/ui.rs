@@ -7,6 +7,7 @@ use iced::widget::{
     row, scrollable, slider, stack, text, text_input,
 };
 use iced::{Color, Element, Length, Theme};
+use iced_code_editor::IndentStyle;
 
 /// Renders the user interface.
 pub fn view(app: &DemoApp) -> Element<'_, Message> {
@@ -411,6 +412,8 @@ pub fn view_editor_pane<'a>(
 
     // We assume these settings are global for now, but could be per-tab
     let wrap_enabled = editor.wrap_enabled();
+    let auto_indent_enabled = editor.auto_indent_enabled();
+    let current_indent_style = editor.indent_style();
     let search_replace_enabled = editor.search_replace_enabled();
     let line_numbers_enabled = editor.line_numbers_enabled();
     let lsp_enabled = editor.lsp_enabled();
@@ -428,6 +431,20 @@ pub fn view_editor_pane<'a>(
         .label("Line wrapping")
         .on_toggle(move |b| Message::ToggleWrap(editor_id, b))
         .text_size(14);
+
+    // Auto-indent checkbox
+    let auto_indent_checkbox = checkbox(auto_indent_enabled)
+        .label("Auto-indentation")
+        .on_toggle(move |b| Message::ToggleAutoIndent(editor_id, b))
+        .text_size(14);
+
+    // Indent style pick_list
+    let indent_style_picker = pick_list(
+        IndentStyle::ALL.as_slice(),
+        Some(current_indent_style),
+        move |style| Message::IndentStyleChanged(editor_id, style),
+    )
+    .text_size(14);
 
     // Search/replace checkbox
     let search_replace_checkbox = checkbox(search_replace_enabled)
@@ -563,6 +580,10 @@ pub fn view_editor_pane<'a>(
                 template_picker,
                 Space::new().width(10),
                 wrap_checkbox,
+                Space::new().width(10),
+                auto_indent_checkbox,
+                Space::new().width(10),
+                indent_style_picker,
                 Space::new().width(10),
                 search_replace_checkbox,
                 Space::new().width(10),

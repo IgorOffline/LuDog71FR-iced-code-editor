@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- feat: auto-indentation on Enter — copies the leading whitespace of the current line to the new line
+  - Toggle on/off via `set_auto_indent_enabled()` / `auto_indent_enabled()`
+- feat: configurable indentation style via `IndentStyle` enum
+  - `IndentStyle::Spaces(n)` (2, 4 or 8 spaces) or `IndentStyle::Tab`
+  - Configure via `set_indent_style()` / `indent_style()`
+  - Default: 4 spaces
+
+### Fixed
+
+- fix: Tab key was navigating to the next widget instead of inserting indentation
 - fix: Example in README.md have error with focus and Input widget ([#17](https://github.com/LuDog71FR/iced-code-editor/issues/17))
 
 ## [0.3.7] - 2026-03-09

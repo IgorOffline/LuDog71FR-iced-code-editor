@@ -248,25 +248,47 @@ impl Command for DeleteForwardCommand {
     }
 }
 
-/// Command for inserting a newline.
+/// Command for inserting a newline, optionally with auto-indentation.
+///
+/// When `indent` is non-empty, the indentation string is inserted at the
+/// beginning of the new line after the split, and the cursor is placed
+/// after the indent. Undo removes the indent chars then joins the lines.
 #[derive(Debug, Clone)]
 pub struct InsertNewlineCommand {
     line: usize,
     col: usize,
     cursor_before: (usize, usize),
     cursor_after: (usize, usize),
+    indent: String,
 }
 
 impl InsertNewlineCommand {
-    /// Creates a new insert newline command.
+    /// Creates a new insert newline command with auto-indentation.
+    ///
+    /// The `indent` string (leading whitespace of the current line) is
+    /// inserted at the start of the new line, and the cursor is placed
+    /// after it.
     ///
     /// # Arguments
     ///
     /// * `line` - Line index where to insert
     /// * `col` - Column position where to split
     /// * `cursor` - Current cursor position
-    pub fn new(line: usize, col: usize, cursor: (usize, usize)) -> Self {
-        Self { line, col, cursor_before: cursor, cursor_after: (line + 1, 0) }
+    /// * `indent` - Leading whitespace to copy to the new line
+    pub fn with_indent(
+        line: usize,
+        col: usize,
+        cursor: (usize, usize),
+        indent: String,
+    ) -> Self {
+        let indent_len = indent.chars().count();
+        Self {
+            line,
+            col,
+            cursor_before: cursor,
+            cursor_after: (line + 1, indent_len),
+            indent,
+        }
     }
 }
 
@@ -277,10 +299,17 @@ impl Command for InsertNewlineCommand {
         cursor: &mut (usize, usize),
     ) {
         buffer.insert_newline(self.line, self.col);
+        for (i, c) in self.indent.chars().enumerate() {
+            buffer.insert_char(self.line + 1, i, c);
+        }
         *cursor = self.cursor_after;
     }
 
     fn undo(&mut self, buffer: &mut TextBuffer, cursor: &mut (usize, usize)) {
+        // Remove indent chars inserted at start of new line
+        for _ in 0..self.indent.chars().count() {
+            buffer.delete_forward(self.line + 1, 0);
+        }
         // Merge the two lines back together
         if self.line + 1 < buffer.line_count() {
             buffer.delete_char(self.line + 1, 0);
@@ -658,7 +687,8 @@ mod tests {
     fn test_insert_newline_command() {
         let mut buffer = TextBuffer::new("hello world");
         let mut cursor = (0, 5);
-        let mut cmd = InsertNewlineCommand::new(0, 5, cursor);
+        let mut cmd =
+            InsertNewlineCommand::with_indent(0, 5, cursor, String::new());
 
         cmd.execute(&mut buffer, &mut cursor);
         assert_eq!(buffer.line(0), "hello");
@@ -668,6 +698,60 @@ mod tests {
         cmd.undo(&mut buffer, &mut cursor);
         assert_eq!(buffer.line(0), "hello world");
         assert_eq!(cursor, (0, 5));
+    }
+
+    #[test]
+    fn test_insert_newline_with_indent_spaces() {
+        let mut buffer = TextBuffer::new("    hello");
+        let mut cursor = (0, 9);
+        let mut cmd =
+            InsertNewlineCommand::with_indent(0, 9, cursor, "    ".to_string());
+
+        cmd.execute(&mut buffer, &mut cursor);
+        assert_eq!(buffer.line(0), "    hello");
+        assert_eq!(buffer.line(1), "    ");
+        assert_eq!(cursor, (1, 4));
+
+        cmd.undo(&mut buffer, &mut cursor);
+        assert_eq!(buffer.line(0), "    hello");
+        assert_eq!(buffer.line_count(), 1);
+        assert_eq!(cursor, (0, 9));
+    }
+
+    #[test]
+    fn test_insert_newline_with_indent_mid_line() {
+        let mut buffer = TextBuffer::new("    hello world");
+        let mut cursor = (0, 9);
+        let mut cmd =
+            InsertNewlineCommand::with_indent(0, 9, cursor, "    ".to_string());
+
+        cmd.execute(&mut buffer, &mut cursor);
+        assert_eq!(buffer.line(0), "    hello");
+        assert_eq!(buffer.line(1), "     world"); // 4 spaces indent + " world"
+        assert_eq!(cursor, (1, 4));
+
+        cmd.undo(&mut buffer, &mut cursor);
+        assert_eq!(buffer.line(0), "    hello world");
+        assert_eq!(buffer.line_count(), 1);
+        assert_eq!(cursor, (0, 9));
+    }
+
+    #[test]
+    fn test_insert_newline_with_indent_tab() {
+        let mut buffer = TextBuffer::new("\thello");
+        let mut cursor = (0, 6);
+        let mut cmd =
+            InsertNewlineCommand::with_indent(0, 6, cursor, "\t".to_string());
+
+        cmd.execute(&mut buffer, &mut cursor);
+        assert_eq!(buffer.line(0), "\thello");
+        assert_eq!(buffer.line(1), "\t");
+        assert_eq!(cursor, (1, 1));
+
+        cmd.undo(&mut buffer, &mut cursor);
+        assert_eq!(buffer.line(0), "\thello");
+        assert_eq!(buffer.line_count(), 1);
+        assert_eq!(cursor, (0, 6));
     }
 
     #[test]

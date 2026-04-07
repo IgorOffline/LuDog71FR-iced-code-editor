@@ -14,7 +14,7 @@ use iced_code_editor::LspOverlayState;
 #[cfg(not(target_arch = "wasm32"))]
 use iced_code_editor::LspPosition;
 use iced_code_editor::Message as EditorMessage;
-use iced_code_editor::{CodeEditor, Language, theme};
+use iced_code_editor::{CodeEditor, IndentStyle, Language, theme};
 #[cfg(not(target_arch = "wasm32"))]
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -156,6 +156,10 @@ pub enum Message {
     RunCode,
     /// Toggle line wrapping
     ToggleWrap(EditorId, bool),
+    /// Toggle auto-indentation
+    ToggleAutoIndent(EditorId, bool),
+    /// Change indentation style
+    IndentStyleChanged(EditorId, IndentStyle),
     /// Toggle search/replace
     ToggleSearchReplace(EditorId, bool),
     /// Toggle line numbers
@@ -575,6 +579,46 @@ greet("World")
         self.current_theme = new_theme;
         for tab in &mut self.tabs {
             tab.editor.set_theme(style);
+        }
+        Task::none()
+    }
+
+    /// Handles changing the indentation style for a specific editor.
+    fn handle_indent_style_changed(
+        &mut self,
+        editor_id: EditorId,
+        style: IndentStyle,
+    ) -> Task<Message> {
+        self.log(
+            "INFO",
+            &format!(
+                "Indent style changed to \"{style}\" in {editor_id:?} editor"
+            ),
+        );
+
+        if let Some(tab) = self.get_tab(editor_id) {
+            tab.editor.set_indent_style(style);
+        }
+        Task::none()
+    }
+
+    /// Handles toggling auto-indentation for a specific editor.
+    fn handle_toggle_auto_indent(
+        &mut self,
+        editor_id: EditorId,
+        enabled: bool,
+    ) -> Task<Message> {
+        self.log(
+            "INFO",
+            &format!(
+                "Auto-indentation {} in {:?} editor",
+                if enabled { "enabled" } else { "disabled" },
+                editor_id
+            ),
+        );
+
+        if let Some(tab) = self.get_tab(editor_id) {
+            tab.editor.set_auto_indent_enabled(enabled);
         }
         Task::none()
     }
@@ -1088,6 +1132,12 @@ greet("World")
             // Editor toggles
             Message::ToggleWrap(editor_id, enabled) => {
                 self.handle_toggle_wrap(editor_id, enabled)
+            }
+            Message::ToggleAutoIndent(editor_id, enabled) => {
+                self.handle_toggle_auto_indent(editor_id, enabled)
+            }
+            Message::IndentStyleChanged(editor_id, style) => {
+                self.handle_indent_style_changed(editor_id, style)
             }
             Message::ToggleSearchReplace(editor_id, enabled) => {
                 self.handle_toggle_search_replace(editor_id, enabled)

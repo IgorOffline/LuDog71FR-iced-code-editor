@@ -859,23 +859,14 @@ impl CodeEditor {
         key: &keyboard::Key,
         modifiers: &keyboard::Modifiers,
     ) -> Option<Action<Message>> {
-        // Handle Tab for focus navigation when search dialog is not open
-        // This implements focus chain management between multiple editors
+        // Shift+Tab: focus navigation backward (Tab alone inserts indentation)
         if matches!(key, keyboard::Key::Named(keyboard::key::Named::Tab))
+            && modifiers.shift()
             && !self.search_state.is_open
         {
-            if modifiers.shift() {
-                // Shift+Tab: focus navigation backward
-                return Some(
-                    Action::publish(Message::FocusNavigationShiftTab)
-                        .and_capture(),
-                );
-            } else {
-                // Tab: focus navigation forward
-                return Some(
-                    Action::publish(Message::FocusNavigationTab).and_capture(),
-                );
-            }
+            return Some(
+                Action::publish(Message::FocusNavigationShiftTab).and_capture(),
+            );
         }
 
         // Handle Ctrl+C / Ctrl+Insert (copy)

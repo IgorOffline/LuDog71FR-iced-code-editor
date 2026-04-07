@@ -31,7 +31,9 @@ impl Default for MyApp {
 impl MyApp {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::EditorEvent(event) => self.editor.update(&event).map(Message::EditorEvent),
+            Message::EditorEvent(event) => {
+                self.editor.update(&event).map(Message::EditorEvent)
+            }
             Message::InputChanged(value) => {
                 self.input_value = value;
                 self.editor.lose_focus();
