@@ -1,0 +1,12 @@
+[package]
+name = "simple-example"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "simple-example"
+path = "src/main.rs"
+
+[dependencies]
+iced = { version = "0.14", features = ["advanced", "highlighter", "canvas", "markdown"] }
+iced-code-editor = { path = "../iced-code-editor" }

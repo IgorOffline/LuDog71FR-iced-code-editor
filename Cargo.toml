@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "iced-code-editor",
     "demo-app",
+    "simple-example",
 ]
 
 default-members = [

@@ -58,18 +58,25 @@ iced-code-editor = "0.3"
 
 Here's a minimal example to integrate the code editor into your Iced application:
 
+> **Note:** `CodeEditor` does not automatically lose focus when another widget is clicked.
+> You must call `editor.lose_focus()` whenever another interactive widget is activated.
+> The pattern below uses `mouse_area` to detect clicks on sibling widgets.
+
 ```rust
-use iced::widget::container;
+use iced::widget::{column, container, mouse_area, text_input};
 use iced::{Element, Task};
 use iced_code_editor::{CodeEditor, Message as EditorMessage};
 
 struct MyApp {
     editor: CodeEditor,
+    input_value: String,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
     EditorEvent(EditorMessage),
+    InputChanged(String),
+    InputClicked,
 }
 
 impl Default for MyApp {
@@ -79,7 +86,10 @@ impl Default for MyApp {
 }
 "#;
 
-        Self { editor: CodeEditor::new(code, "rust") }
+        Self {
+            editor: CodeEditor::new(code, "rust"),
+            input_value: String::new(),
+        }
     }
 }
 
@@ -89,13 +99,33 @@ impl MyApp {
             Message::EditorEvent(event) => {
                 self.editor.update(&event).map(Message::EditorEvent)
             }
+            Message::InputChanged(value) => {
+                self.input_value = value;
+                self.editor.lose_focus(); // required: transfer focus away from editor
+                Task::none()
+            }
+            Message::InputClicked => {
+                self.editor.lose_focus(); // required: transfer focus away from editor
+                Task::none()
+            }
         }
     }
 
     fn view(&self) -> Element<'_, Message> {
-        container(self.editor.view().map(Message::EditorEvent))
-            .padding(20)
-            .into()
+        let input = mouse_area(
+            text_input("Type something...", &self.input_value)
+                .on_input(Message::InputChanged)
+                .padding(8),
+        )
+        .on_press(Message::InputClicked); // detect click to trigger lose_focus
+
+        container(
+            column![input, self.editor.view().map(Message::EditorEvent)]
+                .spacing(10)
+                .height(iced::Fill),
+        )
+        .padding(20)
+        .into()
     }
 }
 
