@@ -377,18 +377,14 @@ mod tests {
         assert!(c.selection_range().is_none());
 
         c.anchor = Some((1, 2));
-        let (start, end) = c.selection_range().unwrap();
-        assert_eq!(start, (1, 2));
-        assert_eq!(end, (1, 5));
+        assert_eq!(c.selection_range(), Some(((1, 2), (1, 5))));
     }
 
     #[test]
     fn test_cursor_selection_range_reversed() {
         let mut c = Cursor::new((1, 2));
         c.anchor = Some((1, 8));
-        let (start, end) = c.selection_range().unwrap();
-        assert_eq!(start, (1, 2));
-        assert_eq!(end, (1, 8));
+        assert_eq!(c.selection_range(), Some(((1, 2), (1, 8))));
     }
 
     #[test]
@@ -403,16 +399,16 @@ mod tests {
         cs.add_cursor_with_selection(c2);
         // Should merge into one cursor spanning (0,0)-(0,8).
         assert_eq!(cs.len(), 1);
-        let range = cs.primary().selection_range().unwrap();
-        assert_eq!(range, ((0, 0), (0, 8)));
+        assert_eq!(cs.primary().selection_range(), Some(((0, 0), (0, 8))));
     }
 
     #[test]
     fn test_clear_all_selections() {
         let mut cs = CursorSet::new((0, 0));
         cs.primary_mut().anchor = Some((0, 5));
-        cs.add_cursor((1, 0));
-        cs.as_mut_slice().last_mut().unwrap().anchor = Some((1, 3));
+        let mut c2 = Cursor::new((1, 0));
+        c2.anchor = Some((1, 3));
+        cs.add_cursor_with_selection(c2);
         cs.clear_all_selections();
         for c in cs.iter() {
             assert!(!c.has_selection());
