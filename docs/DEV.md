@@ -48,6 +48,9 @@
    - [Cache Invalidation](#2-cache-invalidation)
    - [Command History Grouping](#3-command-history-grouping)
    - [Selection Direction](#4-selection-direction)
+   - [Multi-Cursor Edit Order](#5-multi-cursor-edit-order)
+   - [Buffer Revision Bumping](#6-buffer-revision-bumping)
+   - [Highlight Cache Anchor (pre_edit_line)](#7-highlight-cache-anchor-pre_edit_line)
 9. [Future Enhancements](#future-enhancements)
 10. [Contributing Guidelines](#contributing-guidelines)
     - [Code Style](#code-style)
@@ -1254,26 +1257,52 @@ criterion stores results under `target/criterion/` and automatically reports the
 
 ### 1. UTF-8 Character Boundaries
 
-**Problem:** Rust strings are UTF-8, so byte indices ≠ character indices
+**Problem:** Rust strings are UTF-8, so byte indices ≠ character indices. Slicing
+a string with a character offset panics on a non-`char` boundary (accents, CJK,
+emoji).
 
-**Solution:** Use char-aware indexing
+**Solution:** Use the char-aware helpers centralized in `text_utils.rs`, never
+slice with a raw column offset. Every slicing site (text buffer, selection,
+canvas rendering, LSP) goes through these:
 
 ```rust
-fn char_to_byte_index(s: &str, char_index: usize) -> usize {
-    s.char_indices()
-        .nth(char_index)
-        .map_or(s.len(), |(idx, _)| idx)
+// text_utils.rs — single boundary
+pub(crate) fn char_to_byte_index(s: &str, char_index: usize) -> usize {
+    s.char_indices().nth(char_index).map_or(s.len(), |(idx, _)| idx)
 }
+
+// text_utils.rs — both boundaries of a [start, end) range in one pass.
+// Prefer this over two char_to_byte_index() calls: O(end_char) instead of
+// O(n) per boundary. Used in the highlight/selection hot paths.
+pub(crate) fn char_range_to_byte_range(
+    text: &str,
+    start_char: usize,
+    end_char: usize,
+) -> (usize, usize) { /* ... */ }
 ```
 
 ### 2. Cache Invalidation
 
-**Problem:** Forgetting to clear cache leads to stale rendering
+**Problem:** Forgetting to clear a cache leaves stale rendering — but clearing the
+*wrong* layer is the subtler trap. Rendering is split across two `canvas::Cache`
+layers (see [Canvas-Based Rendering](#4-canvas-based-rendering)):
 
-**Solution:** Clear cache on every state change
+- `content_cache` — syntax-highlighted text and the gutter. Expensive to rebuild.
+- `overlay_cache` — cursor, current-line highlight, selection, search matches, IME.
+
+Clearing `content_cache` on every cursor blink or drag would destroy rendering
+performance; clearing only `overlay_cache` after a buffer/layout change would leave
+stale text on screen.
+
+**Solution:** Clear the layer that actually changed.
 
 ```rust
+// Cursor / selection / search moved → overlay only
 self.cursors.set_single(new_position);
+self.overlay_cache.clear();
+
+// Buffer / syntax / theme / wrap / fold changed → both layers
+self.content_cache.clear();
 self.overlay_cache.clear();
 ```
 
@@ -1324,6 +1353,96 @@ pub fn selection_range(&self) -> Option<((usize, usize), (usize, usize))> {
     Some(normalise(anchor, self.position))
 }
 ```
+
+### 5. Multi-Cursor Edit Order
+
+**Problem:** When the same edit is applied at several cursors, applying it in
+document order corrupts every cursor below the first edit. Inserting a character
+at an upper position shifts all positions after it, so a cursor stored as
+`(line, col)` no longer points where it should — subsequent inserts land at the
+wrong column (or the wrong line, after a newline/merge).
+
+**Solution:** Always apply multi-cursor edits in **descending document order**, so
+that edits at higher positions never invalidate positions still to be processed.
+Every edit handler in `update.rs` builds a sorted index list before iterating:
+
+```rust
+// update.rs — handle_character_input_msg, handle_tab, delete handlers, ...
+let mut order: Vec<usize> = (0..self.cursors.len()).collect();
+order.sort_by(|&a, &b| {
+    self.cursors.as_slice()[b]
+        .position
+        .cmp(&self.cursors.as_slice()[a].position)
+});
+for &idx in &order {
+    // apply edit at cursor `idx`, then fix the *other* cursors:
+    adjust_other_cursors(self.cursors.as_mut_slice(), idx, line, col, edit_type);
+}
+```
+
+`adjust_other_cursors()` (`update.rs`) shifts the remaining cursors' positions and
+selection anchors for the edit just made, and `sort_and_merge()` collapses any
+cursors that end up overlapping. A new edit handler that iterates cursors in their
+natural order, or that forgets `adjust_other_cursors()`, will work with a single
+cursor but silently corrupt multi-cursor edits.
+
+### 6. Buffer Revision Bumping
+
+**Problem:** Not every cache is *cleared* — several are **memoized by revision** and
+only recomputed when their key changes:
+
+- `visual_lines_cache` — line wrapping (keyed by `buffer_revision`, viewport, wrap/fold)
+- `foldable_regions_cache` — fold detection (keyed by `buffer_revision`)
+- `max_content_width_cache` — horizontal scroll extent (keyed by `buffer_revision`)
+
+Mutating the buffer without changing `buffer_revision` leaves all of these serving
+stale layout — wrapping, fold regions and scroll width computed against the *old*
+text. This is distinct from [Cache Invalidation](#2-cache-invalidation), which only
+concerns the two `canvas::Cache` rendering layers.
+
+**Solution:** Route every buffer mutation through `finish_edit_operation()`, which
+bumps the revision (and clears the canvas caches and the highlight prefix):
+
+```rust
+// update.rs — finish_edit_operation()
+self.buffer_revision = self.buffer_revision.wrapping_add(1);
+*self.visual_lines_cache.borrow_mut() = None;
+self.invalidate_highlight_from(self.pre_edit_line.saturating_sub(1));
+self.content_cache.clear();
+self.overlay_cache.clear();
+```
+
+Fold-state changes have their own counter (`fold_revision`, bumped via
+`bump_fold_revision()`); the visual-lines cache key includes both. The exact values
+are not meaningful — `wrapping_add` is used so overflow is harmless.
+
+### 7. Highlight Cache Anchor (`pre_edit_line`)
+
+**Problem:** The syntax-highlight prefix is not cleared on edit; it is **truncated**
+from `pre_edit_line` so only lines at or below the edit are re-tokenized
+(see [Syntax Highlighting Optimization](#2-syntax-highlighting-optimization)). If
+`pre_edit_line` is left pointing higher than the real edit, work is wasted; if it is
+left pointing *below* the edit, lines above the truncation keep stale colors — a
+visible bug for multi-line constructs (block comments, strings) whose resume state
+changed.
+
+**Solution:** Capture `pre_edit_line` *before* the edit, from the topmost active
+line, and reset it for edits not anchored to one line:
+
+```rust
+// update.rs — captured at the top of update() before dispatching an edit
+self.pre_edit_line = self.min_active_line();
+
+// Operations whose effect is not local to one line reset the anchor to 0
+// so the whole prefix is rebuilt: undo, redo, Replace All.
+self.pre_edit_line = 0;
+```
+
+`min_active_line()` returns the smallest line touched by any cursor or selection
+anchor. `finish_edit_operation()` then truncates from `pre_edit_line - 1` (a
+one-line margin covering edits that merge with the preceding line, e.g. backspace at
+column 0). A new edit handler must keep `pre_edit_line` consistent with where it
+actually mutates the buffer.
 
 ## Future Enhancements
 
