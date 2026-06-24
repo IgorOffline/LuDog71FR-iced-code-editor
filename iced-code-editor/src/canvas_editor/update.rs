@@ -6,7 +6,8 @@ use iced::widget::operation::{focus, select_all};
 use super::command::{
     Command, CompositeCommand, DeleteCharCommand, DeleteForwardCommand,
     DuplicateLinesCommand, InsertCharCommand, InsertNewlineCommand,
-    MoveLinesCommand, ReplaceTextCommand,
+    MoveLinesCommand, ReplaceTextCommand, ToggleCommentCommand,
+    line_comment_token,
 };
 use super::{
     ArrowDirection, CURSOR_BLINK_INTERVAL, CodeEditor, ImePreedit, IndentStyle,
@@ -552,6 +553,49 @@ impl CodeEditor {
             let block_len = (end - start + 1) as isize;
             self.shift_primary_cursor_lines(block_len);
         }
+        self.history.push(Box::new(cmd));
+
+        self.finish_edit_operation();
+        self.scroll_to_cursor()
+    }
+
+    /// Toggles line comments on the current line, or the lines spanned by the
+    /// primary selection (Ctrl+/).
+    ///
+    /// Secondary cursors are collapsed onto the primary one. If every non-blank
+    /// line in the range is already commented, the range is uncommented;
+    /// otherwise every non-blank line is commented. The operation is a no-op
+    /// when the active syntax has no line-comment token (e.g. HTML) or the range
+    /// holds only blank lines.
+    ///
+    /// # Returns
+    ///
+    /// A `Task<Message>` that scrolls to keep the cursor visible
+    fn toggle_comment(&mut self) -> Task<Message> {
+        self.end_grouping_if_active();
+        self.cursors.remove_all_but_primary();
+
+        let Some(token) = line_comment_token(&self.syntax) else {
+            return Task::none();
+        };
+
+        let (start, end) = self.primary_line_range();
+        let pos = self.cursors.primary_position();
+        let mut cmd =
+            ToggleCommentCommand::new(&self.buffer, start, end, token, pos);
+        if cmd.is_noop() {
+            return Task::none();
+        }
+
+        // Track the selection anchor across the column shift before executing.
+        let new_anchor =
+            self.cursors.primary().anchor.map(|a| cmd.adjust_position(a));
+
+        let mut cursor_pos = pos;
+        cmd.execute(&mut self.buffer, &mut cursor_pos);
+        let primary = self.cursors.primary_mut();
+        primary.position = cursor_pos;
+        primary.anchor = new_anchor;
         self.history.push(Box::new(cmd));
 
         self.finish_edit_operation();
@@ -1842,6 +1886,7 @@ impl CodeEditor {
             Message::MoveLineDown => self.move_lines(true),
             Message::DuplicateLineUp => self.duplicate_lines(false),
             Message::DuplicateLineDown => self.duplicate_lines(true),
+            Message::ToggleComment => self.toggle_comment(),
         }
     }
 }
@@ -2734,5 +2779,42 @@ mod tests {
 
         assert_eq!(editor.buffer.line(0), "ac");
         assert_eq!(editor.buffer.line(1), "df");
+    }
+
+    #[test]
+    fn test_toggle_comment_selection() {
+        let mut editor = CodeEditor::new("a\nb\nc", "rs");
+        // Select lines 0..=2.
+        editor.cursors.primary_mut().anchor = Some((0, 0));
+        editor.cursors.primary_mut().position = (2, 1);
+
+        let _ = editor.update(&Message::ToggleComment);
+        assert_eq!(editor.buffer.to_string(), "// a\n// b\n// c");
+        assert_eq!(editor.cursors.primary_position(), (2, 4));
+
+        // Toggling again uncomments the whole range.
+        let _ = editor.update(&Message::ToggleComment);
+        assert_eq!(editor.buffer.to_string(), "a\nb\nc");
+    }
+
+    #[test]
+    fn test_toggle_comment_noop_without_token() {
+        let mut editor = CodeEditor::new("<div>", "html");
+        let _ = editor.update(&Message::ToggleComment);
+        // HTML has no line-comment token, so the buffer is unchanged.
+        assert_eq!(editor.buffer.line(0), "<div>");
+    }
+
+    #[test]
+    fn test_toggle_comment_undo() {
+        let mut editor = CodeEditor::new("    let x = 1;", "rs");
+        editor.cursors.primary_mut().position = (0, 8);
+
+        let _ = editor.update(&Message::ToggleComment);
+        assert_eq!(editor.buffer.line(0), "    // let x = 1;");
+
+        let _ = editor.update(&Message::Undo);
+        assert_eq!(editor.buffer.line(0), "    let x = 1;");
+        assert_eq!(editor.cursors.primary_position(), (0, 8));
     }
 }

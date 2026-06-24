@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-None
+### Added
+
+- feat: **Toggle comment**
+  - `Ctrl+/` comments the current line, or the lines spanned by the selection
+  - Toggles back to uncommented when every non-blank line in the range is already commented
+  - Indentation-aware (the comment token is inserted after the leading whitespace)
+  - Per-language line-comment tokens (`//` for Rust/JS/TS/Go, `#` for Python, `--` for Lua); a no-op for languages without a line comment
+  - Fully undoable/redoable through the command history
 
 ## [0.3.10] - 2026-06-24
 

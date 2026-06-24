@@ -12,10 +12,9 @@ None
 
 ### Editing
 
-1. **Toggle comment** (line/block, `Ctrl+/`)
-2. **Auto-closing brackets/quotes** + surround selection
-3. **Matching bracket highlight** + indentation guides
-4. **Snippets**
+1. **Auto-closing brackets/quotes** + surround selection
+2. **Matching bracket highlight** + indentation guides
+3. **Snippets**
 
 ### LSP / IntelliSense (completion, hover, go-to-definition already done)
 

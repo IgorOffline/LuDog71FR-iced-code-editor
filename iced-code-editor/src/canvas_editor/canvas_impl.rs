@@ -1084,6 +1084,7 @@ impl CodeEditor {
     fn handle_keyboard_shortcuts(
         &self,
         key: &keyboard::Key,
+        modified_key: &keyboard::Key,
         modifiers: &keyboard::Modifiers,
     ) -> Option<Action<Message>> {
         // Shift+Tab: focus navigation backward (Tab alone inserts indentation)
@@ -1152,6 +1153,19 @@ impl CodeEditor {
             return Some(
                 Action::publish(Message::SelectNextOccurrence).and_capture(),
             );
+        }
+
+        // Handle Ctrl+/ (toggle line comment).
+        //
+        // Match against both the base key and `modified_key` so the shortcut
+        // works regardless of layout: on US/QWERTY `/` is unshifted (in `key`),
+        // while on French AZERTY it is Shift+`:` and only appears in
+        // `modified_key`.
+        if modifiers.control()
+            && (matches!(key, keyboard::Key::Character(c) if c.as_str() == "/")
+                || matches!(modified_key, keyboard::Key::Character(c) if c.as_str() == "/"))
+        {
+            return Some(Action::publish(Message::ToggleComment).and_capture());
         }
 
         // Handle Ctrl+Alt+Up (add cursor above)
@@ -1435,7 +1449,10 @@ impl CodeEditor {
     ///
     /// # Arguments
     ///
-    /// * `key` - The keyboard key that was pressed
+    /// * `key` - The keyboard key that was pressed (base key, no modifiers applied)
+    /// * `modified_key` - The key with all modifiers applied except Ctrl; used
+    ///   for character shortcuts so they work on layouts where the glyph needs
+    ///   Shift (e.g. `/` on French AZERTY)
     /// * `modifiers` - The keyboard modifiers (Ctrl, Shift, Alt, etc.)
     /// * `text` - Optional text content from the keyboard event
     /// * `bounds` - The rectangle bounds of the canvas widget (unused in this implementation)
@@ -1447,6 +1464,7 @@ impl CodeEditor {
     fn handle_keyboard_event(
         &self,
         key: &keyboard::Key,
+        modified_key: &keyboard::Key,
         modifiers: &keyboard::Modifiers,
         text: &Option<iced::advanced::graphics::core::SmolStr>,
         _bounds: Rectangle,
@@ -1467,7 +1485,9 @@ impl CodeEditor {
         }
 
         // Try keyboard shortcuts first
-        if let Some(action) = self.handle_keyboard_shortcuts(key, modifiers) {
+        if let Some(action) =
+            self.handle_keyboard_shortcuts(key, modified_key, modifiers)
+        {
             return Some(action);
         }
 
@@ -1940,13 +1960,19 @@ impl canvas::Program<Message> for CodeEditor {
             }
             Event::Keyboard(keyboard::Event::KeyPressed {
                 key,
+                modified_key,
                 modifiers,
                 text,
                 ..
             }) => {
                 self.modifiers.set(*modifiers);
                 self.handle_keyboard_event(
-                    key, modifiers, text, bounds, &cursor,
+                    key,
+                    modified_key,
+                    modifiers,
+                    text,
+                    bounds,
+                    &cursor,
                 )
             }
             Event::Keyboard(keyboard::Event::KeyReleased {

@@ -40,10 +40,10 @@ Screenshot of the demo application:
 - **Auto indentation** with custom indent style
 - **Multiple cursors** for simultaneous editing at multiple positions
 - **Move and duplicate lines** with keyboard shortcuts
+- **Toggle comment** on the current line or selection (`Ctrl+/`)
 
 ## Planned features
 
-- [ ] Toggle comment
 - [ ] Auto-closing brackets/quotes
 - [ ] Diagnostics display
 - [ ] Find references / Rename symbol
@@ -166,6 +166,7 @@ The editor supports a comprehensive set of keyboard shortcuts:
 | **Tab**            | Insert indent                                                            |
 | **Alt + Up/Down**  | Move current line (or selected lines) up/down                            |
 | **Shift + Alt + Up/Down** | Duplicate current line (or selected lines) above/below            |
+| **Ctrl + /**       | Toggle line comment on current line (or selected lines)                  |
 
 ### Clipboard
 

@@ -574,6 +574,8 @@ pub enum Message {
     DuplicateLineUp,
     /// Shift+Alt+Down: duplicate the current line (or selected line range) below.
     DuplicateLineDown,
+    /// Ctrl+/: toggle line comments on the current line or primary selection.
+    ToggleComment,
 }
 
 /// Indentation style used when pressing the Tab key.
