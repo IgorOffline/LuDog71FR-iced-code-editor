@@ -46,7 +46,6 @@ Screenshot of the demo application:
 ## Planned features
 
 - [ ] Auto-closing brackets/quotes
-- [ ] Diagnostics display
 - [ ] Find references / Rename symbol
 - [ ] Command palette
 - [ ] Minimap

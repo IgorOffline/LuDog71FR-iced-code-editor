@@ -18,22 +18,21 @@ None
 
 ### LSP / IntelliSense (completion, hover, go-to-definition already done)
 
-6. **Diagnostics display** (underlines + gutter + panel)
-7. **Find references** + **Rename symbol**
-8. **Document formatting** (format on save)
-9. **Signature help**
-10. **Code actions / quick fixes**
-11. **Outline / document symbols** (+ breadcrumbs)
+4. **Diagnostics display** (underlines + gutter + panel)
+5. **Find references** + **Rename symbol**
+6. **Document formatting** (format on save)
+7. **Signature help**
+8. **Code actions / quick fixes**
+9. **Outline / document symbols** (+ breadcrumbs)
 
 ### Navigation / UI
 
-12. **Command palette** (`Ctrl+Shift+P`)
-13. **Project-wide search** (find in files)
-14. **Sticky scroll** (pinned scope header)
-15. **Bracket pair colorization** (rainbow brackets)
-16. **Inline color preview** (swatches for `#rrggbb`)
-18. **Minimap** (overview of entire file & clickable navigation)
-19. **Vim mode**
+10. **Command palette** (`Ctrl+Shift+P`)
+11. **Sticky scroll** (pinned scope header)
+12. **Bracket pair colorization** (rainbow brackets)
+13. **Inline color preview** (swatches for `#rrggbb`)
+14. **Minimap** (overview of entire file & clickable navigation)
+15. **Vim mode**
 
 ## Performance Improvements
 
