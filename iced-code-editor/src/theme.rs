@@ -19,6 +19,8 @@ pub struct Style {
     pub scroller_color: Color,
     /// Highlight color for the current line where cursor is located
     pub current_line_highlight: Color,
+    /// Color for visible whitespace characters (spaces as `·`, tabs as `→`)
+    pub whitespace_color: Color,
 }
 
 /// The theme catalog of a code editor.
@@ -123,6 +125,12 @@ pub fn from_iced_theme(theme: &iced::Theme) -> Style {
         if is_dark { 0.15 } else { 0.25 },
     );
 
+    let whitespace_color = if is_dark {
+        dim_color(text_color, 0.65)
+    } else {
+        blend_colors(text_color, background, 0.65)
+    };
+
     Style {
         background,
         text_color,
@@ -132,6 +140,7 @@ pub fn from_iced_theme(theme: &iced::Theme) -> Style {
         scrollbar_background,
         scroller_color,
         current_line_highlight,
+        whitespace_color,
     }
 }
 

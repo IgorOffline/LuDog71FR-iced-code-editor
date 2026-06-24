@@ -41,6 +41,7 @@ Screenshot of the demo application:
 - **Multiple cursors** for simultaneous editing at multiple positions
 - **Move and duplicate lines** with keyboard shortcuts
 - **Toggle comment** on the current line or selection (`Ctrl+/`)
+- **Visible whitespace rendering** — spaces shown as `·`, tabs as `→`
 
 ## Planned features
 
@@ -391,6 +392,25 @@ if editor.line_numbers_enabled() {
 ```
 
 When disabled, the gutter is completely removed (0px width), providing more horizontal space for code display.
+
+### Visible whitespace rendering
+
+Whitespace rendering is **enabled by default**. Spaces are displayed as `·` and tab characters as `→` (with `·` fill to preserve alignment), both drawn in a dimmed color that blends with the active theme.
+
+```rust
+// Disable whitespace rendering
+editor.set_show_whitespace(false);
+
+// Re-enable it
+editor.set_show_whitespace(true);
+
+// Check current state
+if editor.show_whitespace() {
+    println!("Whitespace is visible");
+}
+```
+
+The whitespace color is derived automatically from the active theme via `Style::whitespace_color` and can be overridden in a custom `Style`.
 
 ### Indentation
 

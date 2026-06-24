@@ -166,6 +166,8 @@ pub enum Message {
     ToggleSearchReplace(EditorId, bool),
     /// Toggle line numbers
     ToggleLineNumbers(EditorId, bool),
+    /// Toggle visible whitespace rendering
+    ToggleShowWhitespace(EditorId, bool),
     /// Toggle LSP support
     ToggleLsp(EditorId, bool),
     /// Test text input changed
@@ -709,6 +711,18 @@ greet("World")
         Task::none()
     }
 
+    /// Handles toggling visible whitespace rendering for a specific editor.
+    fn handle_toggle_show_whitespace(
+        &mut self,
+        editor_id: EditorId,
+        enabled: bool,
+    ) -> Task<Message> {
+        if let Some(tab) = self.get_tab(editor_id) {
+            tab.editor.set_show_whitespace(enabled);
+        }
+        Task::none()
+    }
+
     /// Handles toggling LSP support for a specific editor.
     fn handle_toggle_lsp(
         &mut self,
@@ -1170,6 +1184,9 @@ greet("World")
             }
             Message::ToggleLineNumbers(editor_id, enabled) => {
                 self.handle_toggle_line_numbers(editor_id, enabled)
+            }
+            Message::ToggleShowWhitespace(editor_id, enabled) => {
+                self.handle_toggle_show_whitespace(editor_id, enabled)
             }
             Message::ToggleLsp(editor_id, enabled) => {
                 self.handle_toggle_lsp(editor_id, enabled)

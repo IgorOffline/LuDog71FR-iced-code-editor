@@ -31,8 +31,7 @@ None
 13. **Project-wide search** (find in files)
 14. **Sticky scroll** (pinned scope header)
 15. **Bracket pair colorization** (rainbow brackets)
-16. **Whitespace / control-character rendering**
-17. **Inline color preview** (swatches for `#rrggbb`)
+16. **Inline color preview** (swatches for `#rrggbb`)
 18. **Minimap** (overview of entire file & clickable navigation)
 19. **Vim mode**
 

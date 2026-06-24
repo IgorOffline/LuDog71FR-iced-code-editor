@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- feat: **Visible whitespace rendering**
+  - Spaces are rendered as `·` and tabs as `→` (followed by `·` fill characters to preserve alignment)
+  - Whitespace symbols are drawn in a dedicated dimmed color (`Style::whitespace_color`) to stay non-intrusive
+  - Enabled by default; toggle via `set_show_whitespace(bool)` / `show_whitespace()`
+  - `Style` gains a `whitespace_color` field, automatically derived from the active Iced theme
+
 - feat: **Toggle comment**
   - `Ctrl+/` comments the current line, or the lines spanned by the selection
   - Toggles back to uncommented when every non-blank line in the range is already commented

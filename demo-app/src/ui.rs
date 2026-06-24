@@ -418,6 +418,7 @@ pub fn view_editor_pane<'a>(
     let search_replace_enabled = editor.search_replace_enabled();
     let line_numbers_enabled = editor.line_numbers_enabled();
     let lsp_enabled = editor.lsp_enabled();
+    let show_whitespace = editor.show_whitespace();
 
     // Template picker using pick_list
     let template_picker =
@@ -463,6 +464,12 @@ pub fn view_editor_pane<'a>(
     let line_numbers_checkbox = checkbox(line_numbers_enabled)
         .label("Show line numbers")
         .on_toggle(move |b| Message::ToggleLineNumbers(editor_id, b))
+        .text_size(14);
+
+    // Whitespace rendering checkbox
+    let show_whitespace_checkbox = checkbox(show_whitespace)
+        .label("Show whitespace")
+        .on_toggle(move |b| Message::ToggleShowWhitespace(editor_id, b))
         .text_size(14);
 
     // LSP enabled checkbox
@@ -597,6 +604,8 @@ pub fn view_editor_pane<'a>(
                 search_replace_checkbox,
                 Space::new().width(10),
                 line_numbers_checkbox,
+                Space::new().width(10),
+                show_whitespace_checkbox,
                 Space::new().width(10),
                 lsp_enabled_checkbox,
                 Space::new().width(10),

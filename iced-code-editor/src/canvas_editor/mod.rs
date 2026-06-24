@@ -255,6 +255,8 @@ pub struct CodeEditor {
     pub(crate) search_replace_enabled: bool,
     /// Whether line numbers are displayed
     pub(crate) line_numbers_enabled: bool,
+    /// Whether to render whitespace characters visibly (spaces as `·`, tabs as `→`)
+    pub(crate) show_whitespace: bool,
     /// Whether LSP support is enabled
     pub(crate) lsp_enabled: bool,
     /// Active LSP client connection, if configured.
@@ -670,6 +672,7 @@ impl CodeEditor {
             translations: Translations::default(),
             search_replace_enabled: true,
             line_numbers_enabled: true,
+            show_whitespace: true,
             lsp_enabled: true,
             lsp_client: None,
             lsp_document: None,
@@ -1416,6 +1419,36 @@ impl CodeEditor {
     /// `true` if line wrapping is enabled, `false` otherwise
     pub fn wrap_enabled(&self) -> bool {
         self.wrap_enabled
+    }
+
+    /// Enables or disables visible whitespace rendering.
+    ///
+    /// When enabled, space characters are rendered as `·` and tab characters
+    /// as `→`, both drawn in a dimmed color to remain non-intrusive. Toggling
+    /// this setting clears the content cache to trigger an immediate redraw.
+    ///
+    /// # Arguments
+    ///
+    /// * `enabled` - Whether to show whitespace characters
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use iced_code_editor::CodeEditor;
+    ///
+    /// let mut editor = CodeEditor::new("fn main() {}", "rs");
+    /// editor.set_show_whitespace(true);
+    /// ```
+    pub fn set_show_whitespace(&mut self, enabled: bool) {
+        if self.show_whitespace != enabled {
+            self.show_whitespace = enabled;
+            self.content_cache.clear();
+        }
+    }
+
+    /// Returns whether visible whitespace rendering is enabled.
+    pub fn show_whitespace(&self) -> bool {
+        self.show_whitespace
     }
 
     /// Enables or disables code folding (collapse/expand blocks).

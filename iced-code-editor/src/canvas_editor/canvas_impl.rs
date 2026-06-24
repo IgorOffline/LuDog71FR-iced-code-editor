@@ -86,6 +86,55 @@ fn expand_tabs(text: &str, tab_width: usize) -> Cow<'_, str> {
     Cow::Owned(expanded)
 }
 
+/// Expands tabs and replaces whitespace with visible symbols: `\t` → `→` +
+/// `·` fill, ` ` → `·`. The output has the same logical width as the
+/// `expand_tabs` output, so existing width measurements remain valid.
+fn expand_tabs_visible(text: &str, tab_width: usize) -> String {
+    let mut result = String::with_capacity(text.len() * 2);
+    for ch in text.chars() {
+        match ch {
+            '\t' => {
+                result.push('→');
+                for _ in 1..tab_width {
+                    result.push('·');
+                }
+            }
+            ' ' => result.push('·'),
+            other => result.push(other),
+        }
+    }
+    result
+}
+
+/// Splits a string (already processed by [`expand_tabs_visible`]) into
+/// alternating `(is_whitespace, segment)` pairs, where whitespace segments
+/// consist exclusively of `·` and `→` characters.
+fn split_whitespace_segments(text: &str) -> Vec<(bool, &str)> {
+    if text.is_empty() {
+        return vec![];
+    }
+
+    let mut result = Vec::new();
+    let mut seg_start = 0usize;
+    let mut chars = text.char_indices().peekable();
+
+    let is_ws_char = |c: char| c == '·' || c == '→';
+
+    let first_ch = chars.peek().map(|(_, c)| *c).unwrap_or(' ');
+    let mut current_is_ws = is_ws_char(first_ch);
+
+    for (byte_idx, ch) in chars {
+        let ch_is_ws = is_ws_char(ch);
+        if ch_is_ws != current_is_ws {
+            result.push((current_is_ws, &text[seg_start..byte_idx]));
+            seg_start = byte_idx;
+            current_is_ws = ch_is_ws;
+        }
+    }
+    result.push((current_is_ws, &text[seg_start..]));
+    result
+}
+
 /// Converts a syntect highlight [`Style`] into an iced [`Color`].
 ///
 /// Only the foreground color is used; alpha is left fully opaque.
@@ -500,23 +549,50 @@ impl CodeEditor {
                     );
 
                     let segment_text = &text[start_byte..end_byte];
-                    let display_text =
-                        expand_tabs(segment_text, super::TAB_WIDTH)
-                            .into_owned();
+                    let display_text = if self.show_whitespace {
+                        expand_tabs_visible(segment_text, super::TAB_WIDTH)
+                    } else {
+                        expand_tabs(segment_text, super::TAB_WIDTH).into_owned()
+                    };
                     let display_width = measure_text_width(
                         &display_text,
                         ctx.full_char_width,
                         ctx.char_width,
                     );
 
-                    frame.fill_text(canvas::Text {
-                        content: display_text,
-                        position: Point::new(x_offset, y + 2.0),
-                        color: *color,
-                        size: ctx.font_size.into(),
-                        font: ctx.font,
-                        ..canvas::Text::default()
-                    });
+                    if self.show_whitespace {
+                        let ws_color = self.style.whitespace_color;
+                        let mut seg_x = x_offset;
+                        for (is_ws, seg) in
+                            split_whitespace_segments(&display_text)
+                        {
+                            let seg_color =
+                                if is_ws { ws_color } else { *color };
+                            let seg_width = measure_text_width(
+                                seg,
+                                ctx.full_char_width,
+                                ctx.char_width,
+                            );
+                            frame.fill_text(canvas::Text {
+                                content: seg.to_string(),
+                                position: Point::new(seg_x, y + 2.0),
+                                color: seg_color,
+                                size: ctx.font_size.into(),
+                                font: ctx.font,
+                                ..canvas::Text::default()
+                            });
+                            seg_x += seg_width;
+                        }
+                    } else {
+                        frame.fill_text(canvas::Text {
+                            content: display_text,
+                            position: Point::new(x_offset, y + 2.0),
+                            color: *color,
+                            size: ctx.font_size.into(),
+                            font: ctx.font,
+                            ..canvas::Text::default()
+                        });
+                    }
 
                     x_offset += display_width;
                 }
@@ -532,19 +608,43 @@ impl CodeEditor {
                 visual_line.end_col,
             );
             let line_segment = &full_line_content[start_byte..end_byte];
-            let display_text =
-                expand_tabs(line_segment, super::TAB_WIDTH).into_owned();
-            frame.fill_text(canvas::Text {
-                content: display_text,
-                position: Point::new(
-                    ctx.gutter_width + 5.0 - ctx.horizontal_scroll_offset,
-                    y + 2.0,
-                ),
-                color: self.style.text_color,
-                size: ctx.font_size.into(),
-                font: ctx.font,
-                ..canvas::Text::default()
-            });
+            let display_text = if self.show_whitespace {
+                expand_tabs_visible(line_segment, super::TAB_WIDTH)
+            } else {
+                expand_tabs(line_segment, super::TAB_WIDTH).into_owned()
+            };
+            let base_x = ctx.gutter_width + 5.0 - ctx.horizontal_scroll_offset;
+            if self.show_whitespace {
+                let ws_color = self.style.whitespace_color;
+                let text_color = self.style.text_color;
+                let mut seg_x = base_x;
+                for (is_ws, seg) in split_whitespace_segments(&display_text) {
+                    let seg_color = if is_ws { ws_color } else { text_color };
+                    let seg_width = measure_text_width(
+                        seg,
+                        ctx.full_char_width,
+                        ctx.char_width,
+                    );
+                    frame.fill_text(canvas::Text {
+                        content: seg.to_string(),
+                        position: Point::new(seg_x, y + 2.0),
+                        color: seg_color,
+                        size: ctx.font_size.into(),
+                        font: ctx.font,
+                        ..canvas::Text::default()
+                    });
+                    seg_x += seg_width;
+                }
+            } else {
+                frame.fill_text(canvas::Text {
+                    content: display_text,
+                    position: Point::new(base_x, y + 2.0),
+                    color: self.style.text_color,
+                    size: ctx.font_size.into(),
+                    font: ctx.font,
+                    ..canvas::Text::default()
+                });
+            }
         }
     }
 
@@ -2348,5 +2448,47 @@ mod tests {
             sequential_color, independent_color,
             "a line inside a block comment must be colored as a comment"
         );
+    }
+
+    #[test]
+    fn test_expand_tabs_visible_spaces() {
+        assert_eq!(expand_tabs_visible("a b", 4), "a·b");
+        assert_eq!(expand_tabs_visible("  x  ", 4), "··x··");
+    }
+
+    #[test]
+    fn test_expand_tabs_visible_tabs() {
+        // tab_width = 4: '\t' → '→' + 3 × '·'
+        assert_eq!(expand_tabs_visible("\t", 4), "→···");
+        assert_eq!(expand_tabs_visible("a\tb", 4), "a→···b");
+    }
+
+    #[test]
+    fn test_expand_tabs_visible_no_whitespace() {
+        assert_eq!(expand_tabs_visible("hello", 4), "hello");
+    }
+
+    #[test]
+    fn test_split_whitespace_segments_mixed() {
+        let segs = split_whitespace_segments("a·b");
+        assert_eq!(segs, vec![(false, "a"), (true, "·"), (false, "b")]);
+    }
+
+    #[test]
+    fn test_split_whitespace_segments_leading_ws() {
+        let segs = split_whitespace_segments("··x");
+        assert_eq!(segs, vec![(true, "··"), (false, "x")]);
+    }
+
+    #[test]
+    fn test_split_whitespace_segments_all_ws() {
+        let segs = split_whitespace_segments("···");
+        assert_eq!(segs, vec![(true, "···")]);
+    }
+
+    #[test]
+    fn test_split_whitespace_segments_empty() {
+        let segs = split_whitespace_segments("");
+        assert!(segs.is_empty());
     }
 }
