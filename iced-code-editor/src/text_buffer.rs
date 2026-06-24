@@ -198,6 +198,37 @@ impl TextBuffer {
     pub fn line_len(&self, line: usize) -> usize {
         self.lines.get(line).map_or(0, |s| s.chars().count())
     }
+
+    /// Inserts a full line at the given index, shifting following lines down.
+    ///
+    /// The new line is inserted *before* the line currently at `index`. An
+    /// `index` equal to (or greater than) the line count appends the line at
+    /// the end of the buffer.
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - Zero-based position where the line is inserted
+    /// * `content` - The line content (without trailing newline)
+    pub fn insert_line(&mut self, index: usize, content: String) {
+        let index = index.min(self.lines.len());
+        self.lines.insert(index, content);
+    }
+
+    /// Removes the line at the given index, returning its content.
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - Zero-based index of the line to remove
+    ///
+    /// # Returns
+    ///
+    /// The removed line content, or `None` if `index` is out of bounds
+    pub fn remove_line(&mut self, index: usize) -> Option<String> {
+        if index >= self.lines.len() {
+            return None;
+        }
+        Some(self.lines.remove(index))
+    }
 }
 
 #[cfg(test)]
@@ -273,5 +304,40 @@ mod tests {
         // Insert at end
         buffer.replace_range(0, 7, 0, "!");
         assert_eq!(buffer.line(0), "hi rust!");
+    }
+
+    #[test]
+    fn test_insert_line() {
+        let mut buffer = TextBuffer::new("line1\nline3");
+
+        // Insert in the middle
+        buffer.insert_line(1, "line2".to_string());
+        assert_eq!(buffer.line_count(), 3);
+        assert_eq!(buffer.line(0), "line1");
+        assert_eq!(buffer.line(1), "line2");
+        assert_eq!(buffer.line(2), "line3");
+
+        // Insert at the start
+        buffer.insert_line(0, "line0".to_string());
+        assert_eq!(buffer.line(0), "line0");
+
+        // Insert at the end (index beyond bounds is clamped)
+        buffer.insert_line(99, "last".to_string());
+        assert_eq!(buffer.line(buffer.line_count() - 1), "last");
+    }
+
+    #[test]
+    fn test_remove_line() {
+        let mut buffer = TextBuffer::new("line1\nline2\nline3");
+
+        // Remove from the middle
+        assert_eq!(buffer.remove_line(1), Some("line2".to_string()));
+        assert_eq!(buffer.line_count(), 2);
+        assert_eq!(buffer.line(0), "line1");
+        assert_eq!(buffer.line(1), "line3");
+
+        // Out of bounds returns None
+        assert_eq!(buffer.remove_line(5), None);
+        assert_eq!(buffer.line_count(), 2);
     }
 }

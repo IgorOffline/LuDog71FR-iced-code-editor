@@ -1180,6 +1180,34 @@ impl CodeEditor {
             );
         }
 
+        // Handle Alt+Up / Alt+Down (move line) and Shift+Alt+Up / Shift+Alt+Down
+        // (duplicate line). Exclude Control to avoid clashing with the
+        // Ctrl+Alt+Up/Down multi-cursor shortcuts above.
+        if modifiers.alt() && !modifiers.control() {
+            if matches!(
+                key,
+                keyboard::Key::Named(keyboard::key::Named::ArrowUp)
+            ) {
+                let message = if modifiers.shift() {
+                    Message::DuplicateLineUp
+                } else {
+                    Message::MoveLineUp
+                };
+                return Some(Action::publish(message).and_capture());
+            }
+            if matches!(
+                key,
+                keyboard::Key::Named(keyboard::key::Named::ArrowDown)
+            ) {
+                let message = if modifiers.shift() {
+                    Message::DuplicateLineDown
+                } else {
+                    Message::MoveLineDown
+                };
+                return Some(Action::publish(message).and_capture());
+            }
+        }
+
         // Handle Tab (cycle forward in search dialog if open)
         if matches!(key, keyboard::Key::Named(keyboard::key::Named::Tab))
             && self.search_state.is_open

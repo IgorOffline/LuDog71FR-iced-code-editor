@@ -566,6 +566,14 @@ pub enum Message {
     FoldAll,
     /// Unfold every collapsed block in the buffer.
     UnfoldAll,
+    /// Alt+Up: move the current line (or selected line range) up by one line.
+    MoveLineUp,
+    /// Alt+Down: move the current line (or selected line range) down by one line.
+    MoveLineDown,
+    /// Shift+Alt+Up: duplicate the current line (or selected line range) above.
+    DuplicateLineUp,
+    /// Shift+Alt+Down: duplicate the current line (or selected line range) below.
+    DuplicateLineDown,
 }
 
 /// Indentation style used when pressing the Tab key.

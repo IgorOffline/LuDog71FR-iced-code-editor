@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+None
+
+## [0.3.10] - 2026-06-24
+
 ### Added
+
+- feat: **Move and duplicate lines**
+  - `Alt+Up` / `Alt+Down` move the current line (or the selected line range) up/down
+  - `Shift+Alt+Up` / `Shift+Alt+Down` duplicate the current line (or the selected line range) above/below
+  - Fully undoable/redoable through the command history
 
 - feat: Criterion benchmark suite for performance-critical paths
 

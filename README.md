@@ -39,12 +39,12 @@ Screenshot of the demo application:
 - **Language Server Protocol** (LSP) support
 - **Auto indentation** with custom indent style
 - **Multiple cursors** for simultaneous editing at multiple positions
+- **Move and duplicate lines** with keyboard shortcuts
 
 ## Planned features
 
 - [ ] Toggle comment
 - [ ] Auto-closing brackets/quotes
-- [ ] Move / duplicate line
 - [ ] Diagnostics display
 - [ ] Find references / Rename symbol
 - [ ] Command palette
@@ -164,6 +164,8 @@ The editor supports a comprehensive set of keyboard shortcuts:
 | **Shift + Delete** | Delete selected text (same as Delete when selection exists)              |
 | **Enter**          | Insert new line                                                          |
 | **Tab**            | Insert indent                                                            |
+| **Alt + Up/Down**  | Move current line (or selected lines) up/down                            |
+| **Shift + Alt + Up/Down** | Duplicate current line (or selected lines) above/below            |
 
 ### Clipboard
 

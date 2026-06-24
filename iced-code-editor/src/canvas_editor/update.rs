@@ -5,7 +5,8 @@ use iced::widget::operation::{focus, select_all};
 
 use super::command::{
     Command, CompositeCommand, DeleteCharCommand, DeleteForwardCommand,
-    InsertCharCommand, InsertNewlineCommand, ReplaceTextCommand,
+    DuplicateLinesCommand, InsertCharCommand, InsertNewlineCommand,
+    MoveLinesCommand, ReplaceTextCommand,
 };
 use super::{
     ArrowDirection, CURSOR_BLINK_INTERVAL, CodeEditor, ImePreedit, IndentStyle,
@@ -441,6 +442,117 @@ impl CodeEditor {
             );
             self.history.push(Box::new(cmd));
         }
+
+        self.finish_edit_operation();
+        self.scroll_to_cursor()
+    }
+
+    // =========================================================================
+    // Line Manipulation Handlers
+    // =========================================================================
+
+    /// Returns the inclusive line range affected by the primary cursor.
+    ///
+    /// When the primary cursor has a selection, the range covers every line it
+    /// spans. A selection that ends at column 0 of a line does not include that
+    /// trailing line (VS Code convention). Without a selection, the range is the
+    /// single line the cursor sits on.
+    fn primary_line_range(&self) -> (usize, usize) {
+        let primary = self.cursors.primary();
+        match primary.selection_range() {
+            Some((sel_start, sel_end)) => {
+                let end_line = if sel_end.1 == 0 && sel_end.0 > sel_start.0 {
+                    sel_end.0 - 1
+                } else {
+                    sel_end.0
+                };
+                (sel_start.0, end_line)
+            }
+            None => {
+                let line = primary.position.0;
+                (line, line)
+            }
+        }
+    }
+
+    /// Shifts the primary cursor's position and selection anchor by `delta`
+    /// whole lines (positive moves downward) so the selection follows an edit.
+    fn shift_primary_cursor_lines(&mut self, delta: isize) {
+        let primary = self.cursors.primary_mut();
+        primary.position.0 = primary.position.0.saturating_add_signed(delta);
+        if let Some(anchor) = primary.anchor.as_mut() {
+            anchor.0 = anchor.0.saturating_add_signed(delta);
+        }
+    }
+
+    /// Moves the current line, or the lines spanned by the primary selection,
+    /// up or down by one line (Alt+Up / Alt+Down).
+    ///
+    /// Secondary cursors are collapsed onto the primary one. The move is a no-op
+    /// when the affected range is already at the corresponding edge of the
+    /// buffer.
+    ///
+    /// # Arguments
+    ///
+    /// * `down` - `true` to move the range down, `false` to move it up
+    ///
+    /// # Returns
+    ///
+    /// A `Task<Message>` that scrolls to keep the cursor visible
+    fn move_lines(&mut self, down: bool) -> Task<Message> {
+        self.end_grouping_if_active();
+        self.cursors.remove_all_but_primary();
+
+        let (start, end) = self.primary_line_range();
+
+        // Reject moves that would push the range past the buffer edges.
+        if down {
+            if end + 1 >= self.buffer.line_count() {
+                return Task::none();
+            }
+        } else if start == 0 {
+            return Task::none();
+        }
+
+        let pos = self.cursors.primary_position();
+        let mut cmd = MoveLinesCommand::new(start, end, down, pos);
+        let mut cursor_pos = pos;
+        cmd.execute(&mut self.buffer, &mut cursor_pos);
+        self.shift_primary_cursor_lines(if down { 1 } else { -1 });
+        self.history.push(Box::new(cmd));
+
+        self.finish_edit_operation();
+        self.scroll_to_cursor()
+    }
+
+    /// Duplicates the current line, or the lines spanned by the primary
+    /// selection, above or below (Shift+Alt+Up / Shift+Alt+Down).
+    ///
+    /// Secondary cursors are collapsed onto the primary one. A downward
+    /// duplication moves the cursor onto the new copy; an upward one leaves it
+    /// on the (upper) copy.
+    ///
+    /// # Arguments
+    ///
+    /// * `down` - `true` to insert the copy below, `false` to insert it above
+    ///
+    /// # Returns
+    ///
+    /// A `Task<Message>` that scrolls to keep the cursor visible
+    fn duplicate_lines(&mut self, down: bool) -> Task<Message> {
+        self.end_grouping_if_active();
+        self.cursors.remove_all_but_primary();
+
+        let (start, end) = self.primary_line_range();
+        let pos = self.cursors.primary_position();
+        let mut cmd = DuplicateLinesCommand::new(start, end, down, pos);
+        let mut cursor_pos = pos;
+        cmd.execute(&mut self.buffer, &mut cursor_pos);
+        if down {
+            let block_len = (end - start + 1) as isize;
+            self.shift_primary_cursor_lines(block_len);
+        }
+        self.history.push(Box::new(cmd));
 
         self.finish_edit_operation();
         self.scroll_to_cursor()
@@ -1724,6 +1836,12 @@ impl CodeEditor {
                 self.unfold_all();
                 Task::none()
             }
+
+            // Line manipulation operations
+            Message::MoveLineUp => self.move_lines(false),
+            Message::MoveLineDown => self.move_lines(true),
+            Message::DuplicateLineUp => self.duplicate_lines(false),
+            Message::DuplicateLineDown => self.duplicate_lines(true),
         }
     }
 }

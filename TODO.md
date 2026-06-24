@@ -15,8 +15,7 @@ None
 1. **Toggle comment** (line/block, `Ctrl+/`)
 2. **Auto-closing brackets/quotes** + surround selection
 3. **Matching bracket highlight** + indentation guides
-4. **Move / duplicate line** (`Alt+Up/Down`, `Ctrl+Shift+D`)
-5. **Snippets**
+4. **Snippets**
 
 ### LSP / IntelliSense (completion, hover, go-to-definition already done)
 
